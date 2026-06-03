@@ -30,7 +30,9 @@ class EmpProductionAllocationController extends Controller
             ->get();
 
         $sections = DB::table('department_sections')
-            ->orderBy('section')
+            ->leftJoin('departments', 'departments.id', '=', 'department_sections.department_id')
+            ->select('department_sections.id', 'department_sections.section', 'department_sections.department_id', 'departments.name as department_name')
+            ->orderBy('department_sections.section')
             ->get();
 
         return view('ProductionEmployee.empAllocation', compact('departments', 'sections'));
@@ -224,125 +226,172 @@ class EmpProductionAllocationController extends Controller
         }
     }
 
-    // public function meter_reading_upload_csv(Request $request)
-    // {
-    //     $user = Auth::user();
-    //     $permission = $user->can('production-detail-create');
-    //     if (!$permission) {
-    //         return response()->json(['error' => 'UnAuthorized'], 401);
-    //     }
-
-    //     $this->validate($request, [
-    //         'date' => 'required|date',
-    //         'csv_file_u' => 'required|file|mimes:csv,txt|max:2048'
-    //     ]);
-
-    //     $date = $request->input('date');
-    //     $file = $request->file('csv_file_u');
-
-    //     try {
-    //         $fileContents = file($file->getPathname());
-    //         array_shift($fileContents); 
+        private function parseDate($dateString)
+    {
+        try {
+            $dateString = trim($dateString);
             
-    //         $errors = [];
-    //         $successCount = 0;
-    //         $lineNumber = 2;
+            $formats = [
+                'm/d/Y',
+                'n/j/Y',
+                'd/m/Y',
+                'Y-m-d',
+                'Y/m/d',
+                'd-m-Y',
+                'm-d-Y',
+                'Y.m.d',
+                'd.m.Y',
+                'm.d.Y',
+            ];
 
-    //         DB::beginTransaction();
+            foreach ($formats as $format) {
+                $date = \DateTime::createFromFormat($format, $dateString);
+                if ($date !== false) {
+                    $errors = \DateTime::getLastErrors();
+                    if ($errors && $errors['warning_count'] === 0 && $errors['error_count'] === 0) {
+                        return $date->format('Y-m-d');
+                    }
+                }
+            }
 
-    //         foreach ($fileContents as $line) {
-    //             $line = trim($line);
-    //             if (empty($line)) {
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             $data = str_getcsv($line);
-                
-    //             if (count($data) < 2) {
-    //                 $errors[] = "Line {$lineNumber}: Invalid format - expected emp_id,count";
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             $emp_id = trim($data[0]);
-    //             $count = trim($data[1]);
-
-    //             if (empty($emp_id)) {
-    //                 $errors[] = "Line {$lineNumber}: Missing employee ID";
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             if (!is_numeric($count)) {
-    //                 $errors[] = "Line {$lineNumber}: Count must be numeric";
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             $emp = DB::table('employees')
-    //                 ->where('emp_id', $emp_id)
-    //                 ->where('deleted', 0)
-    //                 ->first();
-
-    //             if (!$emp) {
-    //                 $errors[] = "Line {$lineNumber}: Employee ID {$emp_id} not found or inactive";
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             $existing = EmpProductionAllocation::where('date', $date)
-    //                 ->where('emp_id', $emp_id)
-    //                 ->where('status', '!=', '3')
-    //                 ->first();
-
-    //             if ($existing) {
-    //                 $errors[] = "Line {$lineNumber}: Reading already exists for Employee {$emp_id} on {$date}";
-    //                 $lineNumber++;
-    //                 continue;
-    //             }
-
-    //             try {
-    //                 EmpProductionAllocation::create([
-    //                     'date' => $date,
-    //                     'emp_id' => $emp_id,
-    //                     'count' => $count,
-    //                     'status' => '1',
-    //                     'created_by' => Auth::id(),
-    //                     'updated_by' => 0,
-    //                 ]);
-
-    //                 $successCount++;
-    //             } catch (\Exception $e) {
-    //                 $errors[] = "Line {$lineNumber}: Processing error - " . $e->getMessage();
-    //             }
-                
-    //             $lineNumber++;
-    //         }
-
-    //         DB::commit();
-
-    //         $response = [
-    //             'status' => $successCount > 0,
-    //             'msg' => "Successfully processed {$successCount} employees."
-    //         ];
-
-    //         if (!empty($errors)) {
-    //             $response['errors'] = $errors;
-    //             if ($successCount === 0) {
-    //                 $response['status'] = false;
-    //                 $response['msg'] = 'No records were processed due to errors.';
-    //             }
-    //         }
-
-    //         return response()->json($response);
+            return Carbon::parse($dateString)->format('Y-m-d');
             
-    //     } catch (\Exception $e) {
-    //         DB::rollback();
-    //         return response()->json([
-    //             'status' => false,
-    //             'msg' => 'File processing failed: ' . $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    public function emp_prod_allocation_csv(Request $request)
+    {
+        $user = Auth::user();
+        $permission = $user->can('production-detail-create');
+        if (!$permission) {
+            return response()->json(['error' => 'UnAuthorized'], 401);
+        }
+
+        $this->validate($request, [
+            'csv_file_u' => 'required|file|mimes:csv,txt|max:2048'
+        ]);
+
+        $file = $request->file('csv_file_u');
+
+        try {
+            $fileContents = file($file->getPathname());
+            array_shift($fileContents); 
+            
+            $errors = [];
+            $successCount = 0;
+            $lineNumber = 2;
+
+            DB::beginTransaction();
+
+            foreach ($fileContents as $line) {
+                $line = trim($line);
+                if (empty($line)) {
+                    $lineNumber++;
+                    continue;
+                }
+
+                $data = str_getcsv($line);
+                
+                if (count($data) < 3) {
+                    $errors[] = "Line {$lineNumber}: Invalid format - expected emp_id,date,section_id";
+                    $lineNumber++;
+                    continue;
+                }
+                    
+
+                $emp_id     = trim($data[0]);
+                $date_raw   = trim($data[1]);
+                $section_id = trim($data[2]);
+
+                $date = $this->parseDate($date_raw);
+
+                if (empty($emp_id)) {
+                    $errors[] = "Line {$lineNumber}: Missing employee ID";
+                    $lineNumber++;
+                    continue;
+                }
+
+                if (empty($date_raw) || !$date) {
+                    $errors[] = "Line {$lineNumber}: Missing or invalid date";
+                    $lineNumber++;
+                    continue;
+                }
+
+                $section = DB::table('department_sections')->where('id', $section_id)->first();
+                if (!$section) {
+                    $errors[] = "Line {$lineNumber}: Section ID {$section_id} not found";
+                    $lineNumber++;
+                    continue;
+                }
+                $department_id = $section->department_id;
+
+
+                $emp = DB::table('employees')
+                    ->where('emp_id', $emp_id)
+                    ->where('deleted', 0)
+                    ->first();
+
+                if (!$emp) {
+                    $errors[] = "Line {$lineNumber}: Employee ID {$emp_id} not found or inactive";
+                    $lineNumber++;
+                    continue;
+                }
+
+                $existing = EmpProductionAllocation::where('date', $date)
+                    ->where('emp_id', $emp_id)
+                    ->where('section_id', $section_id)
+                    ->where('status', '!=', '3')
+                    ->first();
+
+                if ($existing) {
+                    $errors[] = "Line {$lineNumber}: Record already exists for Employee {$emp_id} on {$date} in Section {$section_id}";
+                    $lineNumber++;
+                    continue;
+                }
+
+                try {
+                    EmpProductionAllocation::create([
+                        'date'          => $date,
+                        'emp_id'        => $emp_id,
+                        'department_id' => $department_id,
+                        'section_id'    => $section_id,
+                        'status'        => '1',
+                        'created_by'    => Auth::id(),
+                        'updated_by'    => 0,
+                    ]);
+                    $successCount++;
+                } catch (\Exception $e) {
+                    $errors[] = "Line {$lineNumber}: Processing error - " . $e->getMessage();
+                }
+                
+                $lineNumber++;
+            }
+
+            DB::commit();
+
+            $response = [
+                'status' => $successCount > 0,
+                'msg' => "Successfully processed {$successCount} employees."
+            ];
+
+            if (!empty($errors)) {
+                $response['errors'] = $errors;
+                if ($successCount === 0) {
+                    $response['status'] = false;
+                    $response['msg'] = 'No records were processed due to errors.';
+                }
+            }
+
+            return response()->json($response);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'status' => false,
+                'msg' => 'File processing failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
