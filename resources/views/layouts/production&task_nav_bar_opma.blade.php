@@ -1,0 +1,42 @@
+<div class="row nowrap" style="padding-top: 5px;padding-bottom: 5px;">
+    <div class="dropdown">
+    <a role="button" data-toggle="dropdown" class="btn navbtncolor" href="#" id="dailymaster">
+      Master Data<span class="caret"></span></a>
+    <ul class="dropdown-menu multi-level dropdownmenucolor" role="menu" aria-labelledby="dropdownMenu">
+
+      <li><a class="dropdown-item" href="{{ route('opma_employee_performance')}}">Employee Performance</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_machines')}}">Machines</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_sizes')}}">Sizes</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_styles')}}">Styles</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_production_amount')}}">Production Amount</a></li>
+
+    </ul>
+  </div>
+  <div class="dropdown">
+    <a role="button" data-toggle="dropdown" class="btn navbtncolor" href="#" id="dailyprocess_opma">
+      Daily Production Process <span class="caret"></span></a>
+    <ul class="dropdown-menu multi-level dropdownmenucolor" role="menu" aria-labelledby="dropdownMenu">
+
+      <li><a class="dropdown-item" href="{{ route('opma_productionallocation')}}">Employee Allocation</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_productionending')}}">Production Ending</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_dailyproductionapprove')}}">Daily Production Summary Approve</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_employeeproductionreport')}}">Employee Daily Production Summary</a></li>
+
+      <li><a class="dropdown-item" href="{{ route('opma_timechanging')}}">Machine Downtime Log</a></li>
+
+    </ul>
+  </div>
+
+  
+   <a role="button" class="btn navbtncolor" href="{{ route('opma_productiontaskapprove') }}" id="opmataskapprove">Production Approval <span class="caret"></span></a>
+ 
+</div>
+
+
