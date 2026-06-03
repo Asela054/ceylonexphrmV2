@@ -32,9 +32,9 @@
                         <button type="button" class="btn btn-primary btn-sm fa-pull-right mr-2" name="create_record" id="create_record">
                             <i class="fas fa-plus mr-2"></i>Add Employees
                         </button>
-                        <!-- <button type="button" class="btn btn-secondary btn-sm fa-pull-right mr-2" name="csv_upload" id="csv_upload">
+                        <button type="button" class="btn btn-secondary btn-sm fa-pull-right mr-2" name="csv_upload" id="csv_upload">
                             <i class="fas fa-upload mr-2"></i>CSV Upload
-                        </button> -->
+                        </button>
                     </div>
                     <div class="col-12">
                         <hr class="border-dark">
@@ -282,6 +282,76 @@
             </div>
         </div>
     </div>
+
+    <!-- CSV Upload Modal -->
+    <div class="modal fade" id="uploadAtModal" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header p-2">
+                    <h5 class="csvmodal-title" id="staticBackdropLabel1">Upload CSV</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="upload_response"></div>
+                    <div class="row">
+                        <div class="col">
+                            <a href="{{ url('/csvsample/employee_allocation_format.csv') }}" class="control-label d-flex justify-content-end">
+                                CSV Format - Download Sample File
+                            </a>
+                        </div>
+                    </div>
+                    <form method="post" id="formUpload" class="form-horizontal">
+                        {{ csrf_field() }}
+                        <div class="row">
+                            <div class="col">
+                                <div class="form-row mb-1">
+                                    <div class="col">
+                                        <label class="small font-weight-bold text-dark">CSV File</label>
+                                        <input required type="file" id="csv_file_u" name="csv_file_u" class="form-control form-control-sm" accept=".csv" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <div class="form-group mt-3">
+                                    <button type="submit" name="action_button" id="btn-upload" class="btn btn-primary btn-sm fa-pull-right px-4">
+                                        <i class="fas fa-upload"></i>&nbsp;Upload
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <!-- Preview Section Table -->
+                <div class="col-12 mt-3">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered table-sm small" id="sectiontableorder">
+                            <thead>
+                                <tr>
+                                    <th>Section ID</th>
+                                    <th>Department</th>
+                                    <th>Section</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sectiontableorderlist">
+                                @foreach($sections as $sec)
+                                <tr>
+                                    <td>{{ $sec->id }}</td>
+                                    <td>{{ $sec->department_name }}</td>
+                                    <td>{{ $sec->section }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- CSV Upload Modal End-->
 
 </main>
 
@@ -804,101 +874,89 @@ $(document).ready(function () {
         });
     });
 
+
     // CSV Upload functionality
-    // $('#csv_upload').click(function() {
-    //     $('#uploadAtModal').modal('show');
-    //     $('#upload_response').html('');
-    // });
+    $('#csv_upload').click(function() {
+        $('#uploadAtModal').modal('show');
+        $('#upload_response').html('');
+    });
 
-    // $('#date_u').on('change', function() {
-    //     if ($(this).val()) {
-    //         $('#csv_file_u').prop('disabled', false);
-    //     } else {
-    //         $('#csv_file_u').prop('disabled', true);
-    //         $('#csv_file_u').val('');
-    //     }
-    // });
-
-    // if (!$('#date_u').val()) {
-    //     $('#csv_file_u').prop('disabled', true);
-    // }
-
-    // $('#formUpload').on('submit', function(e) {
-    //     e.preventDefault();
-    //     let save_btn = $("#btn-upload");
-    //     let btn_prev_text = save_btn.html();
+    $('#formUpload').on('submit', function(e) {
+        e.preventDefault();
+        let save_btn = $("#btn-upload");
+        let btn_prev_text = save_btn.html();
         
-    //     save_btn.html('<i class="fa fa-spinner fa-spin"></i> Uploading...');
-    //     let formData = new FormData($('#formUpload')[0]);
+        save_btn.html('<i class="fa fa-spinner fa-spin"></i> Uploading...');
+        let formData = new FormData($('#formUpload')[0]);
         
-    //     $.ajax({
-    //         url: '{{ route("meter_reading_upload_csv") }}',
-    //         type: 'POST',
-    //         contentType: false,
-    //         processData: false,
-    //         data: formData,
-    //         success: function(res) {
-    //             if (res.status) {
-    //                 let successHtml = `<div class='alert alert-success'>${res.msg}</div>`;
+        $.ajax({
+            url: '{{ route("emp_prod_allocation_csv") }}',
+            type: 'POST',
+            contentType: false,
+            processData: false,
+            data: formData,
+            success: function(res) {
+                if (res.status) {
+                    let successHtml = `<div class='alert alert-success'>${res.msg}</div>`;
                     
-    //                 if (res.errors && res.errors.length > 0) {
-    //                     let errorHtml = '<div class="alert alert-warning mt-2"><strong>Some issues occurred:</strong><ul>';
-    //                     res.errors.forEach(error => {
-    //                         errorHtml += `<li>${error}</li>`;
-    //                     });
-    //                     errorHtml += '</ul></div>';
-    //                     successHtml += errorHtml;
-    //                 }
+                    if (res.errors && res.errors.length > 0) {
+                        let errorHtml = '<div class="alert alert-warning mt-2"><strong>Some issues occurred:</strong><ul>';
+                        res.errors.forEach(error => {
+                            errorHtml += `<li>${error}</li>`;
+                        });
+                        errorHtml += '</ul></div>';
+                        successHtml += errorHtml;
+                    }
                     
-    //                 $('#upload_response').html(successHtml);
+                    $('#upload_response').html(successHtml);
                     
-    //                 if (!res.errors || res.errors.length === 0) {
-    //                     $("#formUpload")[0].reset();
-    //                     setTimeout(function() {
-    //                         $('#uploadAtModal').modal('hide');
-    //                         Swal.fire({
-    //                             position: "top-end",
-    //                             icon: 'success',
-    //                             title: res.msg,
-    //                             showConfirmButton: false,
-    //                             timer: 2500
-    //                         });
-    //                     }, 2000);
-    //                 }
-    //             } else {
-    //                 let html = '<div class="alert alert-danger">';
-    //                 if (res.errors && Array.isArray(res.errors)) {
-    //                     html += '<strong>Errors occurred:</strong><ul>';
-    //                     res.errors.forEach(error => {
-    //                         html += `<li>${error}</li>`;
-    //                     });
-    //                     html += '</ul>';
-    //                 } else {
-    //                     html += res.msg || 'Something went wrong. Please check your file.';
-    //                 }
-    //                 html += '</div>';
-    //                 $('#upload_response').html(html);
-    //             }
+                    if (!res.errors || res.errors.length === 0) {
+                        $("#formUpload")[0].reset();
+                        setTimeout(function() {
+                            $('#uploadAtModal').modal('hide');
+                            Swal.fire({
+                                position: "top-end",
+                                icon: 'success',
+                                title: res.msg,
+                                showConfirmButton: false,
+                                timer: 2500
+                            });
+                        }, 2000);
+                    }
+                } else {
+                    let html = '<div class="alert alert-danger">';
+                    if (res.errors && Array.isArray(res.errors)) {
+                        html += '<strong>Errors occurred:</strong><ul>';
+                        res.errors.forEach(error => {
+                            html += `<li>${error}</li>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html += res.msg || 'Something went wrong. Please check your file.';
+                    }
+                    html += '</div>';
+                    $('#upload_response').html(html);
+                }
                 
-    //             save_btn.html(btn_prev_text);
-    //             $('#uploadAtModal').scrollTop(0);
-    //             $('#dataTable').DataTable().ajax.reload();
-    //         },
-    //         error: function(xhr) {
-    //             let errorMessage = xhr.responseJSON && xhr.responseJSON.message 
-    //                 ? xhr.responseJSON.message 
-    //                 : 'Something went wrong. Please check your file.';
-    //             Swal.fire({
-    //                 position: "top-end",
-    //                 icon: 'error',
-    //                 title: errorMessage,
-    //                 showConfirmButton: false,
-    //                 timer: 2500
-    //             });
-    //             save_btn.html(btn_prev_text);
-    //         }
-    //     });
-    // });
+                save_btn.html(btn_prev_text);
+                $('#uploadAtModal').scrollTop(0);
+                $('#dataTable').DataTable().ajax.reload();
+            },
+            error: function(xhr) {
+                let errorMessage = xhr.responseJSON && xhr.responseJSON.message 
+                    ? xhr.responseJSON.message 
+                    : 'Something went wrong. Please check your file.';
+                Swal.fire({
+                    position: "top-end",
+                    icon: 'error',
+                    title: errorMessage,
+                    showConfirmButton: false,
+                    timer: 2500
+                });
+                save_btn.html(btn_prev_text);
+            }
+        });
+    });
 
     // Delete functionality
     var user_id;
