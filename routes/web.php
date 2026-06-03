@@ -1689,6 +1689,7 @@ Route::post('/emp_prod_allocation_insert', 'ProductionEmployee\EmpProductionAllo
 Route::post('/emp_prod_allocation_edit', 'ProductionEmployee\EmpProductionAllocationController@edit')->name('emp_prod_allocation_edit');
 Route::post('/emp_prod_allocation_update', 'ProductionEmployee\EmpProductionAllocationController@update')->name('emp_prod_allocation_update');
 Route::post('/emp_prod_allocation_delete', 'ProductionEmployee\EmpProductionAllocationController@delete')->name('emp_prod_allocation_delete');
+Route::post('/emp_prod_allocation_csv', 'ProductionEmployee\EmpProductionAllocationController@emp_prod_allocation_csv')->name('emp_prod_allocation_csv');
 // Production Approve Controller Routes
 Route::get('/emp_prod_approve' ,'ProductionEmployee\ProductionApproveController@index')->name('emp_prod_approve');
 Route::post('/emp_prod_approvegenerate' ,'ProductionEmployee\ProductionApproveController@generateproduction')->name('emp_prod_approvegenerate');
