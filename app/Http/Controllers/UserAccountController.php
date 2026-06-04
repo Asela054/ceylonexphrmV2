@@ -394,19 +394,17 @@ class UserAccountController extends Controller
 		}
         
         $html = '';
-        $html .= '<table class="table table-striped table-sm small">
+        $html .= '<div style="overflow-x:auto;width:100%;">
+        <table class="table table-striped table-sm small" style="width:100%;min-width:320px;">
             <thead>
                 <tr>
-                    <th colspan="4" class="text-center">ATTENDANCE SUMMERY</th>
-                    <th colspan="3" class="text-center">SALARY INFOMATION</th>
+                    <th class="text-center" colspan="4">ATTENDANCE SUMMERY</th>
                 </tr>
                 <tr>
                     <th class="text-center">WORK DAYS</th>
                     <th class="text-center">ABSENT DAYS</th>
                     <th class="text-center">LEAVE DAYS</th>
                     <th class="text-center">NOPAY DAYS</th>
-                    <th class="text-left">PAYSLIP TYPES</th>
-                    <th class="text-right">AMOUNT</th>
                 </tr>
             </thead>
             <tbody>
@@ -415,232 +413,126 @@ class UserAccountController extends Controller
                     <td class="text-center">'.$attendance_responseData['absentdays'].'</td>
                     <td class="text-center">'.$attendance_responseData['leave_days'].'</td>
                     <td class="text-center">'.$attendance_responseData['no_pay_days'].'</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        <div style="overflow-x:auto;width:100%;margin-top:16px;">
+        <table class="table table-striped table-sm small" style="width:100%;min-width:280px;table-layout:fixed;">
+            <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+            <thead>
+                <tr>
+                    <th class="text-center" colspan="2">SALARY INFOMATION</th>
+                </tr>
+                <tr>
+                    <th class="text-left">PAYSLIP TYPES</th>
+                    <th class="text-center">AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
                     <td class="text-left">BASIC SALARY</td>
-                    <td class="text-right">'.number_format($sum_array['BASIC'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['BASIC'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">BRA 1</td>
-                    <td class="text-right">'.number_format($sum_array['BRA_I'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['BRA_I'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">BRA 2</td>
-                    <td class="text-right">'.number_format($sum_array['add_bra2'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['add_bra2'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">NOPAY</td>
-                    <td class="text-right">'.number_format($sum_array['NOPAY'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['NOPAY'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">TOTAL BEFORE NOPAY</td>
-                    <td class="text-right">'.number_format($sum_array['tot_bnp'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['tot_bnp'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">ARREARS</td>
-                    <td class="text-right">'.number_format($sum_array['sal_arrears1'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['sal_arrears1'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">ATTENDANCE ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['ATTBONUS'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['ATTBONUS'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">PERF. BASED INCENTIVE</td>
-                    <td class="text-right">'.number_format($sum_array['INCNTV_EMP'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['INCNTV_EMP'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">NIGHT ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['Opma_Night_Alw'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['Opma_Night_Alw'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">TRANSPORT</td>
-                    <td class="text-right">'.number_format($sum_array['add_transport'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['add_transport'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">OTHER ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['add_other'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['add_other'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">OT</td>
-                    <td class="text-right">'.number_format($sum_array['OTHRS1'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['OTHRS1'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">DOUBLE OT</td>
-                    <td class="text-right">'.number_format($sum_array['OTHRS2'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['OTHRS2'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">TOTAL EARN</td>
-                    <th class="text-right">'.number_format($sum_array['tot_earn'], 2).'</th>
+                    <th class="text-center">'.number_format($sum_array['tot_earn'], 2).'</th>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">TOTAL FOR TAX</td>
-                    <th class="text-right">'.number_format($sum_array['tot_fortax'], 2).'</th>
+                    <th class="text-center">'.number_format($sum_array['tot_fortax'], 2).'</th>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">EPF 8</td>
-                    <td class="text-right">('.number_format($sum_array['EPF8'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['EPF8'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">SALARY ADVANCE</td>
-                    <td class="text-right">('.number_format($sum_array['sal_adv'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['sal_adv'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">LOAN</td>
-                    <td class="text-right">('.number_format($sum_array['LOAN'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['LOAN'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">LATE DEDUCTION</td>
-                    <td class="text-right">('.number_format($sum_array['ded_IOU'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['ded_IOU'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">BANK CHARGES</td>
-                    <td class="text-right">('.number_format($sum_array['ded_fund_1'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['ded_fund_1'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">PAYE</td>
-                    <td class="text-right">('.number_format($sum_array['PAYE'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['PAYE'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">OTHER</td>
-                    <td class="text-right">('.number_format($sum_array['ded_other'], 2).')</td>
+                    <td class="text-center">('.number_format($sum_array['ded_other'], 2).')</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">TOTAL DEDUCTION</td>
-                    <th class="text-right">'.number_format($sum_array['tot_ded'], 2).'</th>
+                    <th class="text-center">'.number_format($sum_array['tot_ded'], 2).'</th>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center" style="border-bottom: 1px solid #000;">&nbsp;</td>
+                    <td class="text-left">BALANCE TO PAY</td>
+                    <th class="text-center" style="border-bottom: 3px double #000;">'.number_format($sum_array['NETSAL'], 2).'</th>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left" style="">BALANCE TO PAY</td>
-                    <th class="text-right" style="border-bottom: 3px double #000;">'.number_format($sum_array['NETSAL'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">EPF 12</td>
-                    <td class="text-right">'.number_format($sum_array['EPF12'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['EPF12'], 2).'</td>
                 </tr>
                 <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
                     <td class="text-left">ETF 3</td>
-                    <td class="text-right">'.number_format($sum_array['ETF3'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['ETF3'], 2).'</td>
                 </tr>';
             $html .= '</tbody>  
         </table>';
