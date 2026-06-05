@@ -77,6 +77,15 @@ class UserAccountController extends Controller
         return view('UserAccountSummery.useraccountsummery',compact('emprecordid','emp_id','emp_location','employee','leavetype','emp_name_with_initial','calling_name','payment_period','employees', 'emp_company'));
     }
 
+    private function getRemunerationLayout()
+    {
+        return DB::table('remunerations')
+            ->where('remuneration_cancel', 0)
+            ->select('payslip_spec_code', 'remuneration_name', 'remuneration_type', 'allocation_method')
+            ->orderBy('id', 'asc')
+            ->get();
+    }
+
     public function get_employee_monthlysummery(Request $request)
     {
         $salaryperiodid = $request->input('salaryperiodid');
@@ -423,6 +432,14 @@ class UserAccountController extends Controller
 				}
 			}
 		}
+
+        $remunerationLayout = $this->getRemunerationLayout();
+
+        // Separate into fixed-additions, fixed-deductions, non-fixed-additions, non-fixed-deductions
+        $fixed_additions    = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && $r->remuneration_type === 'addition'; });
+        $fixed_deductions   = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && $r->remuneration_type === 'deduction'; });
+        $nonfixed_additions = $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && $r->remuneration_type === 'addition'; });
+        $nonfixed_deductions= $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && $r->remuneration_type === 'deduction'; });
         
         $html = '';
         $html .= '<div style="overflow-x:auto;width:100%;">
@@ -450,132 +467,121 @@ class UserAccountController extends Controller
         </div>
         <div style="overflow-x:auto;width:100%;margin-top:16px;">
         <table class="table table-striped table-sm small" style="width:100%;min-width:280px;table-layout:fixed;">
-            <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
-            <thead>
+                <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+                <thead style="border-bottom:3px solid #000;">
+                    <tr><th class="text-center" colspan="2">SALARY INFORMATION</th></tr>
+                    <tr><th class="text-left">PAYSLIP TYPES</th><th class="text-center">AMOUNT</th></tr>
+                </thead>
+                <tbody>
                 <tr>
-                    <th class="text-center" colspan="2">SALARY INFOMATION</th>
-                </tr>
-                <tr>
-                    <th class="text-left">PAYSLIP TYPES</th>
-                    <th class="text-center">AMOUNT</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td class="text-left"><strong>BASIC SALARY</strong></td>
-                    <td class="text-center"><strong>'.number_format($sum_array['BASIC'], 2).'</strong></td>
-                </tr>
-                <tr>
-                    <th class="text-center" colspan="2">RECEIVABLES</th>
-                </tr>
-                <tr>
-                    <td class="text-left">BRA 1</td>
-                    <td class="text-center">'.number_format($sum_array['BRA_I'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">BRA 2</td>
-                    <td class="text-center">'.number_format($sum_array['add_bra2'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">TOTAL BEFORE NOPAY</td>
-                    <td class="text-center">'.number_format($sum_array['tot_bnp'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">NOPAY</td>
-                    <td class="text-center">'.number_format($sum_array['NOPAY'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">ARREARS</td>
-                    <td class="text-center">'.number_format($sum_array['sal_arrears1'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">ATTENDANCE ALLOWANCE</td>
-                    <td class="text-center">'.number_format($sum_array['ATTBONUS'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">PERF. BASED INCENTIVE</td>
-                    <td class="text-center">'.number_format($sum_array['INCNTV_EMP'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">NIGHT ALLOWANCE</td>
-                    <td class="text-center">'.number_format($sum_array['Opma_Night_Alw'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">TRANSPORT</td>
-                    <td class="text-center">'.number_format($sum_array['add_transport'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">OTHER ALLOWANCE</td>
-                    <td class="text-center">'.number_format($sum_array['add_other'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">OT</td>
-                    <td class="text-center">'.number_format($sum_array['OTHRS1'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">DOUBLE OT</td>
-                    <td class="text-center">'.number_format($sum_array['OTHRS2'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left"><strong>TOTAL EARN</strong></td>
+                    <td class="text-left">BASIC SALARY</td>
+                    <td class="text-center">'.number_format($sum_array['BASIC'], 2).'</td>
+                </tr>';
+                // FIXED additions
+                foreach ($fixed_additions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+
+                // FIXED deductions 
+                $hasFixedDed = false;
+                foreach ($fixed_deductions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    if (!$hasFixedDed) { $html .= '<tr><th class="text-center" colspan="2">FIXED DEDUCTIONS</th></tr>'; $hasFixedDed = true; }
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+                $html .= '
+                    <tr>
+                        <td class="text-left">TOTAL BEFORE NOPAY</td>
+                        <td class="text-center">'.number_format($sum_array['tot_bnp'], 2).'</td>
+                    </tr>';
+
+                if ($sum_array['NOPAY'] != 0)
+                    $html .= '<tr><td class="text-left">NOPAY</td><td class="text-center">'.number_format($sum_array['NOPAY'], 2).'</td></tr>';
+
+                // ADDITIONS (non-FIXED)
+                $html .= '<tr><th class="text-center" colspan="2">ADDITIONS</th></tr>';
+                foreach ($nonfixed_additions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+
+                if ($sum_array['sal_arrears1'] != 0)
+                    $html .= '<tr><td class="text-left">ARREARS</td><td class="text-center">'.number_format($sum_array['sal_arrears1'], 2).'</td></tr>';
+                // if ($sum_array['OTHRS1'] != 0)
+                //     $html .= '<tr><td class="text-left">OT</td><td class="text-center">'.number_format($sum_array['OTHRS1'], 2).'</td></tr>';
+                // if ($sum_array['OTHRS2'] != 0)
+                //     $html .= '<tr><td class="text-left">DOUBLE OT</td><td class="text-center">'.number_format($sum_array['OTHRS2'], 2).'</td></tr>';
+                if ($sum_array['add_other'] != 0)
+                    $html .= '<tr><td class="text-left">OTHER ALLOWANCE</td><td class="text-center">'.number_format($sum_array['add_other'], 2).'</td></tr>';
+
+                $html .= '<tr>
+                    <td class="text-left"><strong>TOTAL EARNINGS</strong></td>
                     <th class="text-center">'.number_format($sum_array['tot_earn'], 2).'</th>
                 </tr>
                 <tr>
                     <td class="text-left">TOTAL FOR TAX</td>
                     <th class="text-center">'.number_format($sum_array['tot_fortax'], 2).'</th>
-                </tr>
-                <tr style="background-color:#e9ecef;">
-                    <th class="text-center" colspan="2">DEDUCTIONS</th>
-                </tr>
+                </tr>';
+
+                // DEDUCTIONS (non-FIXED)
+                $html .= '<tr style="background-color:#e9ecef;"><th class="text-center" colspan="2">DEDUCTIONS</th></tr>';
+
+                foreach ($nonfixed_deductions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">('.number_format($val, 2).')</td></tr>';
+                }
+
+                if ($sum_array['EPF8'] != 0)
+                    $html .= '<tr><td class="text-left">EPF 8%</td><td class="text-center">('.number_format($sum_array['EPF8'], 2).')</td></tr>';
+                if ($sum_array['sal_adv'] != 0)
+                    $html .= '<tr><td class="text-left">SALARY ADVANCE</td><td class="text-center">('.number_format($sum_array['sal_adv'], 2).')</td></tr>';
+                if ($sum_array['LOAN'] != 0)
+                    $html .= '<tr><td class="text-left">LOAN</td><td class="text-center">('.number_format($sum_array['LOAN'], 2).')</td></tr>';
+                if ($sum_array['ded_IOU'] != 0)
+                    $html .= '<tr><td class="text-left">LATE DEDUCTION</td><td class="text-center">('.number_format($sum_array['ded_IOU'], 2).')</td></tr>';
+                if ($sum_array['ded_fund_1'] != 0)
+                    $html .= '<tr><td class="text-left">BANK CHARGES</td><td class="text-center">('.number_format($sum_array['ded_fund_1'], 2).')</td></tr>';
+                if ($sum_array['PAYE'] != 0)
+                    $html .= '<tr><td class="text-left">PAYE</td><td class="text-center">('.number_format($sum_array['PAYE'], 2).')</td></tr>';
+                if ($sum_array['ded_other'] != 0)
+                    $html .= '<tr><td class="text-left">OTHER DEDUCTIONS</td><td class="text-center">('.number_format($sum_array['ded_other'], 2).')</td></tr>';
+
+                $html .= '
                 <tr>
-                    <td class="text-left">EPF 8</td>
-                    <td class="text-center">('.number_format($sum_array['EPF8'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">SALARY ADVANCE</td>
-                    <td class="text-center">('.number_format($sum_array['sal_adv'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">LOAN</td>
-                    <td class="text-center">('.number_format($sum_array['LOAN'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">LATE DEDUCTION</td>
-                    <td class="text-center">('.number_format($sum_array['ded_IOU'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">BANK CHARGES</td>
-                    <td class="text-center">('.number_format($sum_array['ded_fund_1'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">PAYE</td>
-                    <td class="text-center">('.number_format($sum_array['PAYE'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left">OTHER</td>
-                    <td class="text-center">('.number_format($sum_array['ded_other'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-left"><strong>TOTAL DEDUCTION</strong></td>
+                    <td class="text-left"><strong>TOTAL DEDUCTIONS</strong></td>
                     <th class="text-center">'.number_format($sum_array['tot_ded'], 2).'</th>
                 </tr>
                 <tr style="background-color:#f8f9fa;">
                     <td class="text-left"><strong>BALANCE TO PAY</strong></td>
-                    <th class="text-center" style="border-bottom: 3px double #000;">'.number_format($sum_array['NETSAL'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-left">EPF 12</td>
-                    <td class="text-center">'.number_format($sum_array['EPF12'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-left">ETF 3</td>
-                    <td class="text-center">'.number_format($sum_array['ETF3'], 2).'</td>
+                    <th class="text-center"><span style="border-bottom:3px double #000;padding-bottom:3px">'.number_format($sum_array['NETSAL'], 2).'</span></th>
                 </tr>';
-            $html .= '</tbody>  
+
+                // EMPLOYER CONTRIBUTIONS
+                $html .= '<tr><th class="text-center" colspan="2">EMPLOYER CONTRIBUTIONS</th></tr>';
+                if ($sum_array['EPF12'] != 0)
+                    $html .= '<tr><td class="text-left">EPF (Employer 12%)</td><td class="text-center">'.number_format($sum_array['EPF12'], 2).'</td></tr>';
+                if ($sum_array['ETF3'] != 0)
+                    $html .= '<tr><td class="text-left">ETF (Employer 3%)</td><td class="text-center">'.number_format($sum_array['ETF3'], 2).'</td></tr>';
+
+                $html .= '    </tbody>  
         </table>
         </div>';
         // echo $html;
-        return response() ->json(['result'=>  $attendance_responseData,'salaryresult'=>$sum_array,'payslip_id'=>$payslip_id,'payroll_profile_id'=>$payroll_profile_id,'htmlcontent'=>$html]);
+        return response() ->json([
+            'result'=>  $attendance_responseData,
+            'salaryresult'=>$sum_array,
+            'payslip_id'=>$payslip_id,
+            'payroll_profile_id'=>$payroll_profile_id,
+            'htmlcontent'=>$html]);
     }
 	
     public function downloadSalarySheet(Request $request){
