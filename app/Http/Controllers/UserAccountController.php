@@ -77,6 +77,15 @@ class UserAccountController extends Controller
         return view('UserAccountSummery.useraccountsummery',compact('emprecordid','emp_id','emp_location','employee','leavetype','emp_name_with_initial','calling_name','payment_period','employees', 'emp_company'));
     }
 
+    private function getRemunerationLayout()
+    {
+        return DB::table('remunerations')
+            ->where('remuneration_cancel', 0)
+            ->select('payslip_spec_code', 'remuneration_name', 'remuneration_type', 'allocation_method')
+            ->orderBy('id', 'asc')
+            ->get();
+    }
+
     public function get_employee_monthlysummery(Request $request)
     {
         $salaryperiodid = $request->input('salaryperiodid');
@@ -164,19 +173,27 @@ class UserAccountController extends Controller
         // $employee = DB::select($sqlslip, [$salaryperiodid, $empcompany, $emprecordid, $salaryperiodid]);
 
         $sqlslip="SELECT 
+            --  FROM drv_employee_payslips
             drv_emp.emp_payslip_id, 
             drv_emp.emp_payroll_profile_id, 
             drv_emp.emp_epfno, 
             drv_emp.emp_first_name, 
             drv_emp.location, 
             drv_emp.payslip_held, 
-            drv_emp.payslip_approved, 
+            drv_emp.payslip_approved,
+
+            --  FROM drv_attendance 
             drv_rates.ot1dura, 
             drv_rates.ot2dura, 
             drv_rates.wk_days, 
             drv_rates.abhrs, 
             drv_rates.nopay_days, 
-            IFNULL(job_categories.emp_payroll_workdays, 26) AS emp_payroll_workdays,
+
+            -- IFNULL(job_categories.emp_payroll_workdays, 26) AS emp_payroll_workdays,
+            -- FROM drv_jobinfo
+             drv_jobinfo.emp_payroll_workdays,
+
+            -- FROM drv_salary 
             drv_info.fig_group_title, 
             drv_info.employee_payslip_id,
             drv_info.fig_group, 
@@ -184,7 +201,10 @@ class UserAccountController extends Controller
             drv_info.epf_payable AS epf_payable, 
             drv_info.remuneration_pssc, 
             drv_info.remuneration_tcsc 
+
         FROM 
+            -- SUBQUERY 1: employee + payslip
+            -- Customizable: filter by company, branch, department
             (SELECT 
                 employee_payslips.id AS emp_payslip_id, 
                 employee_payslips.payroll_profile_id AS emp_payroll_profile_id,
@@ -196,15 +216,28 @@ class UserAccountController extends Controller
                 employee_payslips.payslip_approved,
                 payroll_profiles.payroll_act_id
             FROM `employee_payslips` 
-            INNER JOIN payroll_profiles ON employee_payslips.payroll_profile_id=payroll_profiles.id 
-            INNER JOIN employees ON payroll_profiles.emp_id=employees.id 
-            INNER JOIN companies ON employees.emp_company=companies.id 
-            WHERE employee_payslips.payment_period_id=? 
-                AND employees.emp_company=? 
-                AND employees.id=? 
-                AND employee_payslips.payslip_cancel=0) AS drv_emp 
-        INNER JOIN job_categories ON drv_emp.payroll_act_id=job_categories.id
+            INNER JOIN payroll_profiles ON employee_payslips.payroll_profile_id = payroll_profiles.id 
+            INNER JOIN employees ON payroll_profiles.emp_id = employees.id 
+            INNER JOIN companies ON employees.emp_company = companies.id 
+            WHERE employee_payslips.payment_period_id = ? 
+                AND employees.emp_company = ? 
+                AND employees.id  = ? 
+                AND employee_payslips.payslip_cancel = 0) 
+            AS drv_emp
+
+            -- INNER JOIN job_categories ON drv_emp.payroll_act_id=job_categories.id
+            INNER JOIN (
+            -- SUBQUERY 2: Job category info
+            -- Customizable: working days per job type
+            SELECT 
+                id,
+                emp_payroll_workdays
+            FROM job_categories
+            ) AS drv_jobinfo ON drv_emp.payroll_act_id = drv_jobinfo.id
+
         INNER JOIN (
+            -- SUBQUERY 3: Attendance and OT data
+            -- Customizable: include/exclude OT types, add late minutes, half days ...
             SELECT 
                 employee_payslip_id, 
                 sum(normal_rate_otwork_hrs) as ot1dura, 
@@ -213,11 +246,18 @@ class UserAccountController extends Controller
                 0 as abhrs, 
                 SUM(nopay_days) AS nopay_days 
             FROM employee_paid_rates 
-            WHERE date_format(concat(salary_process_year, '-', salary_process_month, '-01'), '%Y-%m') 
-                IN (date_format(?, '%Y-%m'), date_format(?, '%Y-%m')) 
+            WHERE date_format(
+                concat(salary_process_year, '-', salary_process_month, '-01'), '%Y-%m'
+                ) 
+                IN (
+                    date_format(?, '%Y-%m'), 
+                    date_format(?, '%Y-%m')) 
             GROUP BY employee_payslip_id
-        ) AS drv_rates ON drv_emp.emp_payslip_id=drv_rates.employee_payslip_id
+        ) AS drv_rates ON drv_emp.emp_payslip_id = drv_rates.employee_payslip_id
+        
         INNER JOIN (
+            -- SUBQUERY 4: Salary figures/components
+            -- Customizable: filter which fig_group_title show BASIC, EPF, OT, TRANSPORT...
             SELECT 
                 `id` AS fig_id, 
                 `employee_payslip_id`, 
@@ -229,7 +269,7 @@ class UserAccountController extends Controller
                 `fig_value` AS fig_value 
             FROM employee_salary_payments 
             WHERE `payment_period_id`=?
-        ) AS drv_info ON drv_emp.emp_payslip_id=drv_info.employee_payslip_id 
+        ) AS drv_info ON drv_emp.emp_payslip_id = drv_info.employee_payslip_id 
         ORDER BY drv_info.fig_id";
 
         $employee = DB::select($sqlslip, [
@@ -392,21 +432,27 @@ class UserAccountController extends Controller
 				}
 			}
 		}
+
+        $remunerationLayout = $this->getRemunerationLayout();
+
+        // Separate into fixed-additions, fixed-deductions, non-fixed-additions, non-fixed-deductions
+        $fixed_additions    = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && $r->remuneration_type === 'addition'; });
+        $fixed_deductions   = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && $r->remuneration_type === 'deduction'; });
+        $nonfixed_additions = $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && $r->remuneration_type === 'addition'; });
+        $nonfixed_deductions= $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && $r->remuneration_type === 'deduction'; });
         
         $html = '';
-        $html .= '<table class="table table-striped table-sm small">
+        $html .= '<div style="overflow-x:auto;width:100%;">
+        <table class="table table-striped table-sm small" style="width:100%;min-width:320px;">
             <thead>
                 <tr>
-                    <th colspan="4" class="text-center">ATTENDANCE SUMMERY</th>
-                    <th colspan="3" class="text-center">SALARY INFOMATION</th>
+                    <th class="text-center" colspan="4">ATTENDANCE SUMMERY</th>
                 </tr>
                 <tr>
                     <th class="text-center">WORK DAYS</th>
                     <th class="text-center">ABSENT DAYS</th>
                     <th class="text-center">LEAVE DAYS</th>
                     <th class="text-center">NOPAY DAYS</th>
-                    <th class="text-left">PAYSLIP TYPES</th>
-                    <th class="text-right">AMOUNT</th>
                 </tr>
             </thead>
             <tbody>
@@ -415,237 +461,127 @@ class UserAccountController extends Controller
                     <td class="text-center">'.$attendance_responseData['absentdays'].'</td>
                     <td class="text-center">'.$attendance_responseData['leave_days'].'</td>
                     <td class="text-center">'.$attendance_responseData['no_pay_days'].'</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+        <div style="overflow-x:auto;width:100%;margin-top:16px;">
+        <table class="table table-striped table-sm small" style="width:100%;min-width:280px;table-layout:fixed;">
+                <colgroup><col style="width:50%"><col style="width:50%"></colgroup>
+                <thead style="border-bottom:3px solid #000;">
+                    <tr><th class="text-center" colspan="2">SALARY INFORMATION</th></tr>
+                    <tr><th class="text-left">PAYSLIP TYPES</th><th class="text-center">AMOUNT</th></tr>
+                </thead>
+                <tbody>
+                <tr>
                     <td class="text-left">BASIC SALARY</td>
-                    <td class="text-right">'.number_format($sum_array['BASIC'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">BRA 1</td>
-                    <td class="text-right">'.number_format($sum_array['BRA_I'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">BRA 2</td>
-                    <td class="text-right">'.number_format($sum_array['add_bra2'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">NOPAY</td>
-                    <td class="text-right">'.number_format($sum_array['NOPAY'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">TOTAL BEFORE NOPAY</td>
-                    <td class="text-right">'.number_format($sum_array['tot_bnp'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">ARREARS</td>
-                    <td class="text-right">'.number_format($sum_array['sal_arrears1'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">ATTENDANCE ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['ATTBONUS'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">PERF. BASED INCENTIVE</td>
-                    <td class="text-right">'.number_format($sum_array['INCNTV_EMP'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">NIGHT ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['Opma_Night_Alw'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">TRANSPORT</td>
-                    <td class="text-right">'.number_format($sum_array['add_transport'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">OTHER ALLOWANCE</td>
-                    <td class="text-right">'.number_format($sum_array['add_other'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">OT</td>
-                    <td class="text-right">'.number_format($sum_array['OTHRS1'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">DOUBLE OT</td>
-                    <td class="text-right">'.number_format($sum_array['OTHRS2'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">TOTAL EARN</td>
-                    <th class="text-right">'.number_format($sum_array['tot_earn'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">TOTAL FOR TAX</td>
-                    <th class="text-right">'.number_format($sum_array['tot_fortax'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">EPF 8</td>
-                    <td class="text-right">('.number_format($sum_array['EPF8'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">SALARY ADVANCE</td>
-                    <td class="text-right">('.number_format($sum_array['sal_adv'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">LOAN</td>
-                    <td class="text-right">('.number_format($sum_array['LOAN'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">LATE DEDUCTION</td>
-                    <td class="text-right">('.number_format($sum_array['ded_IOU'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">BANK CHARGES</td>
-                    <td class="text-right">('.number_format($sum_array['ded_fund_1'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">PAYE</td>
-                    <td class="text-right">('.number_format($sum_array['PAYE'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">OTHER</td>
-                    <td class="text-right">('.number_format($sum_array['ded_other'], 2).')</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">TOTAL DEDUCTION</td>
-                    <th class="text-right">'.number_format($sum_array['tot_ded'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center" style="border-bottom: 1px solid #000;">&nbsp;</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left" style="">BALANCE TO PAY</td>
-                    <th class="text-right" style="border-bottom: 3px double #000;">'.number_format($sum_array['NETSAL'], 2).'</th>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">EPF 12</td>
-                    <td class="text-right">'.number_format($sum_array['EPF12'], 2).'</td>
-                </tr>
-                <tr>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-center">&nbsp;</td>
-                    <td class="text-left">ETF 3</td>
-                    <td class="text-right">'.number_format($sum_array['ETF3'], 2).'</td>
+                    <td class="text-center">'.number_format($sum_array['BASIC'], 2).'</td>
                 </tr>';
-            $html .= '</tbody>  
-        </table>';
+                // FIXED additions
+                foreach ($fixed_additions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+
+                // FIXED deductions 
+                $hasFixedDed = false;
+                foreach ($fixed_deductions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    if (!$hasFixedDed) { $html .= '<tr><th class="text-center" colspan="2">FIXED DEDUCTIONS</th></tr>'; $hasFixedDed = true; }
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+                $html .= '
+                    <tr>
+                        <td class="text-left">TOTAL BEFORE NOPAY</td>
+                        <td class="text-center">'.number_format($sum_array['tot_bnp'], 2).'</td>
+                    </tr>';
+
+                if ($sum_array['NOPAY'] != 0)
+                    $html .= '<tr><td class="text-left">NOPAY</td><td class="text-center">'.number_format($sum_array['NOPAY'], 2).'</td></tr>';
+
+                // ADDITIONS (non-FIXED)
+                $html .= '<tr><th class="text-center" colspan="2">ADDITIONS</th></tr>';
+                foreach ($nonfixed_additions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                }
+
+                if ($sum_array['sal_arrears1'] != 0)
+                    $html .= '<tr><td class="text-left">ARREARS</td><td class="text-center">'.number_format($sum_array['sal_arrears1'], 2).'</td></tr>';
+                // if ($sum_array['OTHRS1'] != 0)
+                //     $html .= '<tr><td class="text-left">OT</td><td class="text-center">'.number_format($sum_array['OTHRS1'], 2).'</td></tr>';
+                // if ($sum_array['OTHRS2'] != 0)
+                //     $html .= '<tr><td class="text-left">DOUBLE OT</td><td class="text-center">'.number_format($sum_array['OTHRS2'], 2).'</td></tr>';
+                if ($sum_array['add_other'] != 0)
+                    $html .= '<tr><td class="text-left">OTHER ALLOWANCE</td><td class="text-center">'.number_format($sum_array['add_other'], 2).'</td></tr>';
+
+                $html .= '<tr>
+                    <td class="text-left"><strong>TOTAL EARNINGS</strong></td>
+                    <th class="text-center">'.number_format($sum_array['tot_earn'], 2).'</th>
+                </tr>
+                <tr>
+                    <td class="text-left">TOTAL FOR TAX</td>
+                    <th class="text-center">'.number_format($sum_array['tot_fortax'], 2).'</th>
+                </tr>';
+
+                // DEDUCTIONS (non-FIXED)
+                $html .= '<tr style="background-color:#e9ecef;"><th class="text-center" colspan="2">DEDUCTIONS</th></tr>';
+
+                foreach ($nonfixed_deductions as $rem) {
+                    $key = isset($sum_array[$rem->payslip_spec_code]) ? $rem->payslip_spec_code : null;
+                    $val = $key ? $sum_array[$key] : 0;
+                    if ($val == 0) continue;
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">('.number_format($val, 2).')</td></tr>';
+                }
+
+                if ($sum_array['EPF8'] != 0)
+                    $html .= '<tr><td class="text-left">EPF 8%</td><td class="text-center">('.number_format($sum_array['EPF8'], 2).')</td></tr>';
+                if ($sum_array['sal_adv'] != 0)
+                    $html .= '<tr><td class="text-left">SALARY ADVANCE</td><td class="text-center">('.number_format($sum_array['sal_adv'], 2).')</td></tr>';
+                if ($sum_array['LOAN'] != 0)
+                    $html .= '<tr><td class="text-left">LOAN</td><td class="text-center">('.number_format($sum_array['LOAN'], 2).')</td></tr>';
+                if ($sum_array['ded_IOU'] != 0)
+                    $html .= '<tr><td class="text-left">LATE DEDUCTION</td><td class="text-center">('.number_format($sum_array['ded_IOU'], 2).')</td></tr>';
+                if ($sum_array['ded_fund_1'] != 0)
+                    $html .= '<tr><td class="text-left">BANK CHARGES</td><td class="text-center">('.number_format($sum_array['ded_fund_1'], 2).')</td></tr>';
+                if ($sum_array['PAYE'] != 0)
+                    $html .= '<tr><td class="text-left">PAYE</td><td class="text-center">('.number_format($sum_array['PAYE'], 2).')</td></tr>';
+                if ($sum_array['ded_other'] != 0)
+                    $html .= '<tr><td class="text-left">OTHER DEDUCTIONS</td><td class="text-center">('.number_format($sum_array['ded_other'], 2).')</td></tr>';
+
+                $html .= '
+                <tr>
+                    <td class="text-left"><strong>TOTAL DEDUCTIONS</strong></td>
+                    <th class="text-center">'.number_format($sum_array['tot_ded'], 2).'</th>
+                </tr>
+                <tr style="background-color:#f8f9fa;">
+                    <td class="text-left"><strong>BALANCE TO PAY</strong></td>
+                    <th class="text-center"><span style="border-bottom:3px double #000;padding-bottom:3px">'.number_format($sum_array['NETSAL'], 2).'</span></th>
+                </tr>';
+
+                // EMPLOYER CONTRIBUTIONS
+                $html .= '<tr><th class="text-center" colspan="2">EMPLOYER CONTRIBUTIONS</th></tr>';
+                if ($sum_array['EPF12'] != 0)
+                    $html .= '<tr><td class="text-left">EPF (Employer 12%)</td><td class="text-center">'.number_format($sum_array['EPF12'], 2).'</td></tr>';
+                if ($sum_array['ETF3'] != 0)
+                    $html .= '<tr><td class="text-left">ETF (Employer 3%)</td><td class="text-center">'.number_format($sum_array['ETF3'], 2).'</td></tr>';
+
+                $html .= '    </tbody>  
+        </table>
+        </div>';
         // echo $html;
-        return response() ->json(['result'=>  $attendance_responseData,'salaryresult'=>$sum_array,'payslip_id'=>$payslip_id,'payroll_profile_id'=>$payroll_profile_id,'htmlcontent'=>$html]);
+        return response() ->json([
+            'result'=>  $attendance_responseData,
+            'salaryresult'=>$sum_array,
+            'payslip_id'=>$payslip_id,
+            'payroll_profile_id'=>$payroll_profile_id,
+            'htmlcontent'=>$html]);
     }
 	
     public function downloadSalarySheet(Request $request){
