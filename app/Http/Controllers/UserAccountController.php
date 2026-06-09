@@ -435,6 +435,19 @@ class UserAccountController extends Controller
 
         $remunerationLayout = $this->getRemunerationLayout();
 
+        // Get salary adjustments
+        $salary_adjustments = DB::table('salary_adjustments')
+        ->where('approved_status', 1)
+        ->where(function($q) use ($emprecordid, $monthworkingdaysdata) {
+            $q->where(function($q2) use ($emprecordid) {
+                $q2->where('adjustment_type', 1)->where('emp_id', $emprecordid);
+            })->orWhere(function($q2) use ($monthworkingdaysdata) {
+                $q2->where('adjustment_type', 2)->where('job_id', $monthworkingdaysdata->job_category_id);
+            });
+        })
+        ->get()
+        ->groupBy('remuneration_id');
+
         // Separate into fixed-additions, fixed-deductions, non-fixed-additions, non-fixed-deductions
         $fixed_additions    = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && strtolower($r->remuneration_type) === 'addition'; });
         $fixed_deductions   = $remunerationLayout->filter(function($r) { return $r->allocation_method === 'FIXED' && strtolower($r->remuneration_type) === 'deduction'; });
@@ -481,7 +494,9 @@ class UserAccountController extends Controller
                 foreach ($fixed_additions as $rem) {
                     $val = isset($sum_array[$rem->payslip_spec_code]) ? (float)$sum_array[$rem->payslip_spec_code] : 0;
                     if ($val == 0) continue;
-                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                    $adj = isset($salary_adjustments[$rem->id]) ? $salary_adjustments[$rem->id]->sum('amount') : 0;
+                    $adj_str = $adj != 0 ? '&nbsp;&nbsp;(' . number_format($adj, 2) . ')' : '';
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).$adj_str.'</td></tr>';
                 }
 
                 // FIXED deductions 
@@ -506,7 +521,9 @@ class UserAccountController extends Controller
                 foreach ($nonfixed_additions as $rem) {
                     $val = isset($sum_array[$rem->payslip_spec_code]) ? (float)$sum_array[$rem->payslip_spec_code] : 0;
                     if ($val == 0) continue;
-                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).'</td></tr>';
+                    $adj = isset($salary_adjustments[$rem->id]) ? $salary_adjustments[$rem->id]->sum('amount') : 0;
+                    $adj_str = $adj != 0 ? '&nbsp;&nbsp;(' . number_format($adj, 2) . ')' : '';
+                    $html .= '<tr><td class="text-left">'.$rem->remuneration_name.'</td><td class="text-center">'.number_format($val, 2).$adj_str.'</td></tr>';
                 }
 
                 if ($sum_array['sal_arrears1'] != 0)
