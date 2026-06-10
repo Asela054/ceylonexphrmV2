@@ -81,7 +81,7 @@ class UserAccountController extends Controller
     {
         return DB::table('remunerations')
             ->where('remuneration_cancel', 0)
-            ->select('payslip_spec_code', 'remuneration_name', 'remuneration_type', 'allocation_method')
+            ->select('id', 'payslip_spec_code', 'remuneration_name', 'remuneration_type', 'allocation_method')
             ->orderBy('id', 'asc')
             ->get();
     }
@@ -454,6 +454,8 @@ class UserAccountController extends Controller
         $nonfixed_additions = $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && strtolower($r->remuneration_type) === 'addition'; });
         $nonfixed_deductions= $remunerationLayout->filter(function($r) { return $r->allocation_method !== 'FIXED' && strtolower($r->remuneration_type) === 'deduction'; });
         
+        $tot_adj = $salary_adjustments->flatten()->sum('amount');
+        $tot_adj_str = $tot_adj != 0 ? '&nbsp;&nbsp;(' . number_format($tot_adj, 2) . ')' : '';
         $html = '';
         $html .= '<div style="overflow-x:auto;width:100%;">
         <table class="table table-striped table-sm small" style="width:100%;min-width:320px;">
@@ -545,7 +547,7 @@ class UserAccountController extends Controller
 
                 $html .= '<tr>
                     <td class="text-left">TOTAL EARNINGS</td>
-                    <th class="text-center">'.number_format($sum_array['tot_earn'], 2).'</th>
+                    <th class="text-center">'.number_format($sum_array['tot_earn'], 2).$tot_adj_str.'</th>
                 </tr>
                 
                 <tr>
