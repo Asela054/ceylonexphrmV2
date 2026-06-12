@@ -31,9 +31,13 @@
          
             <li><a class="dropdown-item" href="{{ route('absentnopay')}}">Absent Noapy Apply</a></li> 
 
-            <li><a class="dropdown-item" href="{{ route('ot_approve')}}">OT Approve</a></li>
+            <!-- <li><a class="dropdown-item" href="{{ route('ot_approve')}}">OT Approve</a></li> -->
+
+            <li><a class="dropdown-item" href="{{ route('ceylone_OT_approve')}}">OT Approve</a></li>
         
-            <li><a class="dropdown-item" href="{{ route('ot_approved')}}">Approved OT</a></li>
+            <!-- <li><a class="dropdown-item" href="{{ route('ot_approved')}}">Approved OT</a></li> -->
+
+            <li><a class="dropdown-item" href="{{ route('ceylone_approved_ot')}}">Approved OT</a></li>
        
             <li><a class="dropdown-item" href="{{ route('AttendanceApprovel')}}">Attendance Approval</a></li>
           

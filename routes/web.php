@@ -1696,7 +1696,14 @@ Route::post('/emp_prod_approvegenerate' ,'ProductionEmployee\ProductionApproveCo
 Route::post('/approveproduction' ,'ProductionEmployee\ProductionApproveController@approveproduction')->name('approveproduction');
 Route::post('/emp_prod_date_details', 'ProductionEmployee\ProductionApproveController@getDateDetails')->name('emp_prod_date_details');
 //CelonXP Employee Production Routes
-
+// CelonXP OT Routes
+Route::get('/ceylone_OT_approve' ,'CeylonOt\CeyloneOTApproveController@index')->name('ceylone_OT_approve');
+Route::post('/ceylone_OT_approvegenerate' ,'CeylonOt\CeyloneOTApproveController@generateot')->name('ceylone_OT_approvegenerate');
+Route::post('/ceylone_approve_ot' ,'CeylonOt\CeyloneOTApproveController@approveot')->name('ceylone_approve_ot');
+Route::post('/ceylone_OT_details', 'CeylonOt\CeyloneOTApproveController@getOtDetails')->name('ceylone_OT_details');
+// CelonXP Approved OT Routes
+Route::get('/ceylone_approved_ot', 'CeylonOt\CeyloneApprovedOTController@index')->name('ceylone_approved_ot');
+Route::post('/ceylon_ot_approved_delete', 'CeylonOt\CeyloneApprovedOTController@ceylon_ot_approved_delete')->name('ceylon_ot_approved_delete');
 
 
 
