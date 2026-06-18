@@ -297,7 +297,7 @@
                     <div id="upload_response"></div>
                     <div class="row">
                         <div class="col">
-                            <a href="{{ url('/csvsample/employee_allocation_format.csv') }}" class="control-label d-flex justify-content-end">
+                            <a href="{{ url('/public/csvsample/employee_allocation_format.csv') }}" class="control-label d-flex justify-content-end">
                                 CSV Format - Download Sample File
                             </a>
                         </div>
