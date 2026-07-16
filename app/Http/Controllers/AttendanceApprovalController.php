@@ -14,7 +14,7 @@ use DateTime;
 
 class AttendanceApprovalController extends Controller
 {
-     public function attendanceapprovel()
+    public function attendanceapprovel()
     {
         $user = Auth::user();
         $permission = $user->can('attendance-approve');
@@ -36,8 +36,8 @@ class AttendanceApprovalController extends Controller
 
         $location = $request->get('company');
         $department = $request->get('department');
-        $month = $request->get('month');
-        $closedate = $request->get('closedate');
+         $fromdate = $request->get('fromdate');
+        $todate = $request->get('todate');
         
         // Get accessible employee IDs based on user access rights
         $userId = Auth::id();
@@ -64,15 +64,11 @@ class AttendanceApprovalController extends Controller
             )
             ->from('employees as employees')
             // ->leftJoin('attendances as at1', 'employees.emp_id', '=', 'at1.uid')
-            ->leftJoin('attendances as at1', function ($join) use ($month) {
+            ->leftJoin('attendances as at1', function ($join) use ($fromdate, $todate) {
                 $join->on('employees.emp_id', '=', 'at1.uid')
                     ->whereNull('at1.deleted_at'); 
-                if (!empty($month)) {
-                    $m_str = $month . "%";
-                    $join->where('at1.date', 'like', $m_str); 
-                }
-                if (!empty($closedate)) {
-                    $join->where('at1.date', '<=', $closedate);
+                if (!empty($fromdate) && !empty($todate)) {
+                    $join->whereBetween('at1.date', [$fromdate, $todate]);
                 }
             })
             ->leftJoin('branches', 'at1.location', '=', 'branches.id')
@@ -102,35 +98,35 @@ class AttendanceApprovalController extends Controller
                 }
                 return '-';
             })
-            ->addColumn('work_days', function ($row) use ($month, $closedate) {
+            ->addColumn('work_days', function ($row) use ($fromdate, $todate) {
                 if ($row->attendance_id) {
-                    return $work_days = (new \App\Attendance)->get_work_days($row->emp_id, $month, $closedate);
+                    return $work_days = (new \App\Attendance_st)->get_work_days($row->emp_id, $fromdate, $todate);
                 }
                 return 0;
             })
-            ->addColumn('working_week_days', function ($row) use ($month , $closedate) {
+            ->addColumn('working_week_days', function ($row) use ($fromdate , $todate) {
                 if ($row->attendance_id) {
-                    $working_week_days_arr = (new \App\Attendance)->get_working_week_days($row->emp_id, $month, $closedate);
+                    $working_week_days_arr = (new \App\Attendance_st)->get_working_week_days($row->emp_id, $fromdate, $todate);
                     return $working_week_days_arr['no_of_working_workdays'];
                 }
                 return 0;
                 
             })
-            ->addColumn('working_hours', function ($row) use ($month, $closedate) {
+            ->addColumn('working_hours', function ($row) use ($fromdate, $todate) {
                 if ($row->attendance_id) {
-                    return $working_hours  = (new \App\Attendance)->get_working_hours($row->emp_id, $month, $closedate);
+                    return $working_hours  = (new \App\Attendance_st)->get_working_hours($row->emp_id, $fromdate, $todate);
                 }
                 return 0;
             })
-            ->addColumn('leave_days', function ($row) use ($month, $closedate) {
+            ->addColumn('leave_days', function ($row) use ($fromdate, $todate) {
                 if ($row->attendance_id) {
-                    return $leave_days = (new \App\Leave)->get_leave_days($row->emp_id, $month, $closedate);
+                    return $leave_days = (new \App\Leave_st)->get_leave_days($row->emp_id, $fromdate, $todate);
                 }
                 return 0;
             })
-            ->addColumn('no_pay_days', function ($row) use ($month, $closedate) {
+            ->addColumn('no_pay_days', function ($row) use ($fromdate, $todate) {
                 if ($row->attendance_id) {
-                    return $no_pay_days = (new \App\Leave)->get_no_pay_days($row->emp_id, $month, $closedate);
+                    return $no_pay_days = (new \App\Leave_st)->get_no_pay_days($row->emp_id, $fromdate, $todate);
                 }
                 return 0;
                
@@ -311,28 +307,20 @@ class AttendanceApprovalController extends Controller
 
         $location = $request->get('company');
         $department = $request->get('department');
-        $month = $request->get('month');
-        $closedate = $request->get('closedate');
+        $fromdate = $request->get('fromdate');
+        $todate = $request->get('todate');
 
-        $selectedyear = substr($month, 0, 4);
-        $selectedmonth = substr($month, -2);
-        $startDate = new DateTime("$selectedyear-$selectedmonth-01");
-        $endDate = (clone $startDate)->modify('first day of next month');
-        
-        $closedateObj = new DateTime($closedate);
-        if ($endDate > $closedateObj) {
-            $endDate = $closedateObj;
-        }
+         $startDate = new DateTime($fromdate);
+        $endDate = new DateTime($todate);
 
-        $dateRange = [];
-        while ($startDate < $endDate) {
+
+       $dateRange = [];
+        while ($startDate <= $endDate) {
             $dateRange[] = $startDate->format('Y-m-d');
             $startDate->add(new DateInterval('P1D'));
         }
-          // If $closedate is within the month, include it in the range
-          if ($closedateObj->format('Y-m-d') >= $startDate->format('Y-m-d')) {
-            $dateRange[] = $closedateObj->format('Y-m-d');
-        }
+
+        $month = Carbon::parse($todate)->format('Y-m');
 
         $query = DB::query()
             ->select('at1.id as attendance_id',
@@ -357,15 +345,14 @@ class AttendanceApprovalController extends Controller
             )
             ->from('employees as employees')
             // ->leftJoin('attendances as at1', 'employees.emp_id', '=', 'at1.uid')
-            ->leftJoin('attendances as at1', function ($join) use ($month) {
+             ->leftJoin('attendances as at1', function ($join) use ($fromdate, $todate) {
                 $join->on('employees.emp_id', '=', 'at1.uid')
                     ->whereNull('at1.deleted_at'); 
-                if (!empty($month)) {
-                    $m_str = $month . "%";
-                    $join->where('at1.date', 'like', $m_str); 
+                if (!empty($fromdate)) {
+                    $join->where('at1.date', '>=', $fromdate);
                 }
-                if (!empty($closedate)) {
-                    $join->where('at1.date', '<=', $closedate);
+                if (!empty($todate)) {
+                    $join->where('at1.date', '<=', $todate);
                 }
             })
             ->leftJoin('branches', 'at1.location', '=', 'branches.id')
@@ -387,11 +374,11 @@ class AttendanceApprovalController extends Controller
             $totalweekworkshours = 0;
             $late_day_amount = 0;
 
-            $work_days = (new \App\Attendance)->get_work_days($record->emp_id, $month, $closedate);
-            $working_week_days_arr = (new \App\Attendance)->get_working_week_days($record->emp_id, $month, $closedate);
+           $work_days = (new \App\Attendance_st)->get_work_days($record->emp_id, $fromdate, $todate);
+            $working_week_days_arr = (new \App\Attendance_st)->get_working_week_days($record->emp_id, $fromdate, $todate);
             $working_week_days = $working_week_days_arr['no_of_working_workdays'];
 
-            $working_week_days_confirmed = (new \App\Attendance)->get_working_week_days_confirmed($record->emp_id, $month, $closedate);
+            $working_week_days_confirmed = (new \App\Attendance_st)->get_working_week_days_confirmed($record->emp_id, $fromdate, $todate);
 
             $confirmed_wd = $working_week_days;
 
@@ -399,14 +386,14 @@ class AttendanceApprovalController extends Controller
                 $confirmed_wd = $working_week_days_confirmed['no_of_days'];
             }
 
-            $leave_days = (new \App\Leave)->get_leave_days($record->emp_id, $month , $closedate);
-            $no_pay_days = (new \App\Leave)->get_no_pay_days($record->emp_id, $month, $closedate);
+             $leave_days = (new \App\Leave_st)->get_leave_days($record->emp_id,  $fromdate, $todate);
+            $no_pay_days = (new \App\Leave_st)->get_no_pay_days($record->emp_id, $fromdate, $todate);
 
-            $normal_ot_hours = (new \App\OtApproved)->get_ot_hours_monthly($record->emp_id, $month, $closedate);
+            $normal_ot_hours = (new \App\OtApproved_st)->get_ot_hours_monthly($record->emp_id, $fromdate, $todate);
 
-            $double_ot_hours = (new \App\OtApproved)->get_double_ot_hours_monthly($record->emp_id, $month, $closedate);
+            $double_ot_hours = (new \App\OtApproved_st)->get_double_ot_hours_monthly($record->emp_id, $fromdate, $todate);
 
-            $triple_ot_hours = (new \App\OtApproved)->get_triple_ot_hours_monthly($record->emp_id, $month, $closedate);
+            $triple_ot_hours = (new \App\OtApproved_st)->get_triple_ot_hours_monthly($record->emp_id, $fromdate, $todate);
 
             $auditattedance = (new \App\Auditattendace)->apply_audit_attedance($record->emp_auto_id,$record->emp_id, $month);
             
