@@ -87,16 +87,16 @@
                                     </select>
                                 </div>
                             </li>
-                            <li class="mb-2">
+                           <li class="mb-2">
                                 <div class="col-md-12">
-                                    <label class="small font-weight-bolder text-dark">Month</label>
-                                     <input type="month" id="month" name="month" class="form-control form-control-sm" placeholder="yyyy-mm" required>
+                                   <label class="small font-weight-bolder text-dark">From Date</label>
+                                 <input type="date" id="fromdate" name="fromdate" class="form-control form-control-sm" required>
                                 </div>
                             </li>
                             <li class="mb-2">
                                 <div class="col-md-12">
-                                   <label class="small font-weight-bolder text-dark">Close Date</label>
-                                 <input type="date" id="closedate" name="closedate" class="form-control form-control-sm" required>
+                                   <label class="small font-weight-bolder text-dark">To Date</label>
+                                 <input type="date" id="todate" name="todate" class="form-control form-control-sm" required>
                                 </div>
                             </li>
                             <li>
@@ -205,7 +205,7 @@ $(document).ready(function () {
 
    showInitialMessage();
 
-    function load_dt(company,department, month, closedate){
+    function load_dt(company,department,fromdate, todate){
         
         $('#attendtable').DataTable({
            "destroy": true,
@@ -247,7 +247,7 @@ $(document).ready(function () {
             ],
             ajax: {
                 "url": "{{url('/attendance_list_for_approve')}}",
-                "data": {'company':company, 'department':department, 'month':month, 'closedate':closedate},
+                "data": {'company':company, 'department':department,'fromdate':fromdate, 'todate':todate},
             },
 
             columns: [
@@ -277,10 +277,10 @@ $(document).ready(function () {
         e.preventDefault();
         let department = $('#department').val();
         let company = $('#company').val();
-        let month = $('#month').val();
-        let closedate = $('#closedate').val();
+        let fromdate = $('#fromdate').val();
+        let todate = $('#todate').val();
 
-        load_dt(company, department, month, closedate);
+        load_dt(company, department, fromdate, todate);
         closeOffcanvasSmoothly();
     });
 
@@ -288,9 +288,8 @@ $(document).ready(function () {
         e.preventDefault();
         let department = $('#department').val();
         let company = $('#company').val();
-        let month = $('#month').val();
-        let closedate = $('#closedate').val();
-
+       let fromdate = $('#fromdate').val();
+        let todate = $('#todate').val();
          var r = await Otherconfirmation("You want to Edit this ? ");
 
         if (r == true) {
@@ -301,8 +300,8 @@ $(document).ready(function () {
                 data: {
                     department: department,
                     company: company,
-                    month: month,
-                    closedate: closedate,
+                    fromdate: fromdate,
+                    todate: todate,
                     _token: $('input[name=_token]').val(),
                 },
                 success: function (data) {
@@ -364,9 +363,15 @@ $(document).ready(function () {
             $('#location').val(null).trigger('change');
         });
               
-        $('#month').on('change', function() {
-            updateClosingDateConstraints();
-        });
+         $('#fromdate').on('change', function() {
+                let fromDate = $(this).val();
+                $('#todate').attr('min', fromDate); 
+            });
+
+            $('#todate').on('change', function() {
+                let toDate = $(this).val();
+                $('#fromdate').attr('max', toDate); 
+            });
 });
 
 $(document).on('click', '.view_button', function () {
